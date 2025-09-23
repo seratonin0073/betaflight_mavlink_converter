@@ -1,0 +1,3 @@
+/home/danylo/CLionProjects/betaflight-mavlink-converter/cmake-build-debug/CMakeFiles/betaflight_mavlink_converter.dir
+/home/danylo/CLionProjects/betaflight-mavlink-converter/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/danylo/CLionProjects/betaflight-mavlink-converter/cmake-build-debug/CMakeFiles/rebuild_cache.dir
