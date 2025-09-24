@@ -4,7 +4,7 @@ echo "🔨 Збірка для Raspberry Pi..."
 mkdir -p build
 cd build
 
-cmake -DARM=ON ..
+cmake -DARM=ON
 
 make -j$(nproc)
 
