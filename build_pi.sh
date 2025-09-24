@@ -1,14 +1,17 @@
 #!/bin/bash
-echo "Збірка для Raspberry Pi..."
 
-mkdir -p build
-cd build
+echo "Збірка bfmavconverter..."
 
-cmake -DARM=ON ..
-
-make -j$(nproc)
+# Компіляція всіх .cpp файлів
+g++ -std=c++11 -I. -O2 \
+    src/*.cpp \
+    -o bfmavconverter \
+    -lpthread
 
 if [ -f "bfmavconverter" ]; then
-    echo "Програму успішно зібрано для Raspberry Pi!"
-    chmod +x
+    echo "bfmavconverter успішно зібрано!"
+    chmod +x bfmavconverter
+    echo "Розташування: $(pwd)/bfmavconverter"
+else
+    echo "Помилка компіляції!"
 fi
