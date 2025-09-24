@@ -1,17 +1,16 @@
 #!/bin/bash
 
-echo "Збірка bfmavconverter..."
+echo "Збірка з кореневої директорії..."
 
-# Компіляція всіх .cpp файлів
 g++ -std=c++11 -I. -O2 \
-    src/*.cpp \
+    *.cpp \
     -o bfmavconverter \
     -lpthread
 
 if [ -f "bfmavconverter" ]; then
-    echo "bfmavconverter успішно зібрано!"
+    echo "Успішно!"
     chmod +x bfmavconverter
-    echo "Розташування: $(pwd)/bfmavconverter"
 else
-    echo "Помилка компіляції!"
+    echo "Не вдалося. Файли .cpp:"
+    ls *.cpp
 fi
