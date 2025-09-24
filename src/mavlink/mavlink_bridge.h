@@ -4,14 +4,15 @@
 #include <cstdint>
 #include "../msp/msp_protocol.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+// Включаємо MAVLink заголовки
+#include "../lib/mavlink/common/mavlink.h"
 
 struct MAVLinkMessage {
     std::vector<uint8_t> data;
-    uint8_t msgid;
+    uint16_t msgid;
     uint8_t len;
+
+    MAVLinkMessage() : msgid(0), len(0) {}
 };
 
 class MAVLinkBridge {
@@ -27,4 +28,8 @@ private:
     uint8_t sequenceNumber_;
     uint8_t systemId_;
     uint8_t componentId_;
+    uint64_t bootTimeMs_;
+
+    uint64_t getBootTimeMs() const;
+    void packMAVLinkMessage(const mavlink_message_t& mavMsg, MAVLinkMessage& msg);
 };
