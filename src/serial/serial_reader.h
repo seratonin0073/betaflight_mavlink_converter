@@ -34,6 +34,11 @@ private:
     void requestLoop();
     void emulateData();
 
+    void sendNextRequest();
+    std::atomic<bool> waitingForResponse{false};
+    uint8_t currentCommand{0};
+    int requestCounter{0};
+
     std::vector<uint8_t> createMSPRequest(uint8_t command);
 
     std::string port_;

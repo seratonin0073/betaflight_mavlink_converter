@@ -263,37 +263,55 @@ bool SerialReader::sendMSPRequest(uint8_t command) {
     return writeData(request);
 }
 
+void SerialReader::sendNextRequest() {
+    if (!serialImpl_ || !serialImpl_->isOpen() || waitingForResponse) {
+        return;
+    }
+
+    const uint8_t commands[] = {108, 105, 130}; // ATTITUDE, RC, BATTERY
+    const char* commandNames[] = {"ATTITUDE", "RC_CHANNELS", "BATTERY_STATE"};
+
+    currentCommand = commands[requestCounter % 3];
+    std::string commandName = commandNames[requestCounter % 3];
+
+    std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << std::endl;
+
+    if (sendMSPRequest(currentCommand)) {
+        waitingForResponse = true;
+        std::cout << "Запит відправлено, очікую відповідь..." << std::endl;
+    }
+
+    requestCounter++;
+}
+
 void SerialReader::readLoop() {
     uint8_t buffer[256];
     std::cout << "Потік читання запущено" << std::endl;
 
     int totalReadAttempts = 0;
     int successfulReads = 0;
-    auto lastStatusTime = std::chrono::steady_clock::now();
+
+    sendNextRequest();
 
     while (!stopRequested_ && serialImpl_ && serialImpl_->isOpen()) {
         totalReadAttempts++;
 
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
 
-        auto currentTime = std::chrono::steady_clock::now();
-        auto timeSinceLastStatus = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastStatusTime).count();
-
-        if (timeSinceLastStatus >= 3) {
-            std::cout << "СТАН: " << successfulReads << "/" << totalReadAttempts
-                      << " спроб успішні" << std::endl;
-            lastStatusTime = currentTime;
-        }
-
         if (bytesRead > 0) {
             successfulReads++;
             std::vector<uint8_t> data(buffer, buffer + bytesRead);
 
-            std::cout << "ОТРИМАНО ДАНІ: " << bytesRead << " байт" << std::endl;
+            std::cout << "ОТРИМАНО ВІДПОВІДЬ: " << bytesRead << " байт" << std::endl;
 
             if (dataReceived && !data.empty()) {
                 dataReceived(data);
             }
+
+            waitingForResponse = false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            sendNextRequest();
+
         } else if (bytesRead < 0) {
             std::cout << "ПОМИЛКА ЧИТАННЯ" << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -306,51 +324,9 @@ void SerialReader::readLoop() {
 }
 
 void SerialReader::requestLoop() {
-    std::cout << "Потік запитів MSP запущено" << std::endl;
-
-    const uint8_t MSP_ATTITUDE = 108;
-    const uint8_t MSP_RC = 105;
-    const uint8_t MSP_BATTERY_STATE = 130;
-
-    int requestCounter = 0;
-
     while (!stopRequested_) {
-        if (!serialImpl_ || !serialImpl_->isOpen()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        uint8_t command;
-        std::string commandName;
-
-        switch (requestCounter % 3) {
-            case 0:
-                command = MSP_ATTITUDE;
-                commandName = "ATTITUDE";
-                break;
-            case 1:
-                command = MSP_RC;
-                commandName = "RC_CHANNELS";
-                break;
-            case 2:
-                command = MSP_BATTERY_STATE;
-                commandName = "BATTERY_STATE";
-                break;
-        }
-
-        std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << std::endl;
-
-        if (sendMSPRequest(command)) {
-            std::cout << "Запит відправлено" << std::endl;
-        } else {
-            std::cout << "Помилка відправки" << std::endl;
-        }
-
-        requestCounter++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
-
-    std::cout << "Потік запитів MSP зупинено" << std::endl;
 }
 
 void SerialReader::enableEmulation() {
