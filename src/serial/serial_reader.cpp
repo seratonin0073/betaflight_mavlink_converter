@@ -239,7 +239,7 @@ bool SerialReader::writeData(const std::vector<uint8_t>& data) {
         return false;
     }
 
-    std::cout << "Успішно відправлено " << bytesWritten << " байт" << std::endl;
+    //std::cout << "Успішно відправлено " << bytesWritten << " байт" << std::endl;
     return true;
 }
 

@@ -21,16 +21,15 @@ void signalHandler(int signum) {
 void printHelp() {
     std::cout << "Використання: bfmavconverter [options]" << std::endl;
     std::cout << "Опції:" << std::endl;
-    std::cout << "  --device DEVICE    Послідовний порт (за замовчуванням: авто-визначення)" << std::endl;
-    std::cout << "  --baud BAUDRATE    Швидкість (за замовчуванням: 115200)" << std::endl;
+    std::cout << "  --device DEVICE    Послідовний порт" << std::endl;
+    std::cout << "  --baud BAUDRATE    Швидкість" << std::endl;
     std::cout << "  --udp              Увімкнути відправку MAVLink через UDP" << std::endl;
-    std::cout << "  --emulate          Увімкнути режим емуляції (без підключення до порту)" << std::endl;
-    std::cout << "  --help             Показати цю довідку" << std::endl;
+    std::cout << "  --emulate          Увімкнути режим емуляції" << std::endl;
+    std::cout << "  --help             Показати довідку" << std::endl;
     std::cout << std::endl;
     std::cout << "Приклади:" << std::endl;
     std::cout << "  ./bfmavconverter --device /dev/ttyUSB0 --baud 115200 --udp" << std::endl;
-    std::cout << "  ./bfmavconverter --emulate --udp  (режим емуляції)" << std::endl;
-    std::cout << "  ./bfmavconverter --help" << std::endl;
+    std::cout << "  ./bfmavconverter --emulate --udp" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -66,7 +65,6 @@ int main(int argc, char *argv[]) {
             return 0;
         } else {
             std::cerr << "Невідомий аргумент: " << arg << std::endl;
-            std::cerr << "Використовуйте --help для довідки" << std::endl;
             return 1;
         }
     }
@@ -84,25 +82,38 @@ int main(int argc, char *argv[]) {
         if (enableUdp) {
             try {
                 udpSender = std::make_shared<UDPSender>("127.0.0.1", 14550);
-                std::cout << "UDP відправка налаштована на 127.0.0.1:14550" << std::endl;
+                if (udpSender->isConnected()) {
+                    std::cout << "UDP відправка налаштована на 127.0.0.1:14550" << std::endl;
+                } else {
+                    std::cout << "UDP не підключено" << std::endl;
+                    udpSender = nullptr;
+                }
             } catch (const std::exception& e) {
                 std::cerr << "Помилка ініціалізації UDP: " << e.what() << std::endl;
-                std::cout << "Продовжую без UDP..." << std::endl;
             }
         }
 
         serialReader->dataReceived = [&](const std::vector<uint8_t>& data) {
+            std::cout << "СИРІ ДАНІ: " << data.size() << " байт: ";
+            for (size_t i = 0; i < std::min(data.size(), size_t(10)); i++) {
+                printf("%02X ", data[i]);
+            }
+            if (data.size() > 10) std::cout << "...";
+            std::cout << std::endl;
+
             mspParser->processData(data);
         };
 
         mspParser->attitudeReceived = [&](const AttitudeData& attitude) {
-            std::cout << "[MSP] Отримано ATTITUDE: roll=" << attitude.roll
-                      << "°, pitch=" << attitude.pitch
-                      << "°, yaw=" << attitude.yaw << "°" << std::endl;
+            std::cout << "[MSP] ATTITUDE:" << std::endl;
+            std::cout << "  roll=" << attitude.roll << "°" << std::endl;
+            std::cout << "  pitch=" << attitude.pitch << "°" << std::endl;
+            std::cout << "  yaw=" << attitude.yaw << "°" << std::endl;
 
             auto mavMsg = mavlinkBridge->convertAttitude(attitude);
-            std::cout << "[MAVLink] Згенеровано ATTITUDE (ID=" << static_cast<int>(mavMsg.msgid)
-                      << ", len=" << static_cast<int>(mavMsg.len) << " байт)" << std::endl;
+            std::cout << "[MAVLink] ATTITUDE пакет" << std::endl;
+            std::cout << "  ID: " << static_cast<int>(mavMsg.msgid) << std::endl;
+            std::cout << "  Розмір: " << static_cast<int>(mavMsg.len) << " байт" << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(mavMsg);
@@ -110,16 +121,17 @@ int main(int argc, char *argv[]) {
         };
 
         mspParser->rcChannelsReceived = [&](const RCChannelsData& channels) {
-            std::cout << "[MSP] Отримано RC_CHANNELS: ";
+            std::cout << "[MSP] RC_CHANNELS:" << std::endl;
+            std::cout << "  Канали: ";
             for (int i = 0; i < 4; i++) {
                 std::cout << channels.channels[i];
                 if (i < 3) std::cout << ", ";
             }
-            std::cout << ", ..." << std::endl;
+            std::cout << std::endl;
 
             auto mavMsg = mavlinkBridge->convertRCChannels(channels);
-            std::cout << "[MAVLink] Згенеровано RC_CHANNELS (ID=" << static_cast<int>(mavMsg.msgid)
-                      << ", len=" << static_cast<int>(mavMsg.len) << " байт)" << std::endl;
+            std::cout << "[MAVLink] RC_CHANNELS пакет" << std::endl;
+            std::cout << "  ID: " << static_cast<int>(mavMsg.msgid) << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(mavMsg);
@@ -127,18 +139,18 @@ int main(int argc, char *argv[]) {
         };
 
         mspParser->batteryStateReceived = [&](const BatteryData& battery) {
-            std::cout << "[MSP] Отримано BATTERY: voltage=" << battery.voltage
-                      << "V, current=" << battery.current
-                      << "A, capacity=" << battery.capacity
-                      << "mAh (" << static_cast<int>(battery.percentage) << "%)" << std::endl;
+            std::cout << "[MSP] BATTERY:" << std::endl;
+            std::cout << "  Напруга: " << battery.voltage << "V" << std::endl;
+            std::cout << "  Струм: " << battery.current << "A" << std::endl;
+            std::cout << "  Ємність: " << battery.capacity << "mAh" << std::endl;
+            std::cout << "  Заряд: " << static_cast<int>(battery.percentage) << "%" << std::endl;
 
             auto statusMsg = mavlinkBridge->convertSystemStatus(battery);
             auto batteryMsg = mavlinkBridge->convertBatteryStatus(battery);
 
-            std::cout << "[MAVLink] Згенеровано SYS_STATUS (ID=" << static_cast<int>(statusMsg.msgid)
-                      << ", len=" << static_cast<int>(statusMsg.len) << " байт)" << std::endl;
-            std::cout << "[MAVLink] Згенеровано BATTERY_STATUS (ID=" << static_cast<int>(batteryMsg.msgid)
-                      << ", len=" << static_cast<int>(batteryMsg.len) << " байт)" << std::endl;
+            std::cout << "[MAVLink] Два пакети:" << std::endl;
+            std::cout << "  SYS_STATUS (ID: " << static_cast<int>(statusMsg.msgid) << ")" << std::endl;
+            std::cout << "  BATTERY_STATUS (ID: " << static_cast<int>(batteryMsg.msgid) << ")" << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(statusMsg);
@@ -150,18 +162,11 @@ int main(int argc, char *argv[]) {
             std::cout << "Запуск емуляції даних..." << std::endl;
             serialReader->enableEmulation();
         } else {
-            std::cout << "Спроба підключення до порту " << device << "..." << std::endl;
+            std::cout << "Підключення до порту " << device << "..." << std::endl;
             if (serialReader->startReading()) {
-                std::cout << "Успішно підключено до порту. Очікування даних..." << std::endl;
+                std::cout << "Успішно підключено. Очікування даних..." << std::endl;
             } else {
-                std::cerr << "Не вдалося відкрити порт. Перевірте:" << std::endl;
-                std::cerr << "   - Чи підключено політний контролер" << std::endl;
-                std::cerr << "   - Чи правильний порт (" << device << ")" << std::endl;
-                std::cerr << "   - Чи ввімкнено MSP в Betaflight Configurator" << std::endl;
-                std::cerr << "   - Чи є права доступу (sudo usermod -a -G dialout $USER)" << std::endl;
-                std::cerr << "   - Чи не зайнятий порт іншою програмою" << std::endl;
-                std::cerr << std::endl;
-                std::cerr << "Для тестування використовуйте: ./bfmavconverter --emulate" << std::endl;
+                std::cerr << "Не вдалося відкрити порт" << std::endl;
                 return 1;
             }
         }
@@ -180,7 +185,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Роботу завершено." << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "Критична помилка: " << e.what() << std::endl;
+        std::cerr << "Помилка: " << e.what() << std::endl;
         return 1;
     }
 
