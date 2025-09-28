@@ -267,31 +267,39 @@ void SerialReader::readLoop() {
     uint8_t buffer[256];
     std::cout << "Потік читання запущено" << std::endl;
 
+    int totalReadAttempts = 0;
+    int successfulReads = 0;
+    auto lastStatusTime = std::chrono::steady_clock::now();
+
     while (!stopRequested_ && serialImpl_ && serialImpl_->isOpen()) {
+        totalReadAttempts++;
+
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
 
-        if (bytesRead > 0) {
-            // ВИВІД ОТРИМАНИХ ДАНИХ
-            std::cout << "[ОТРИМАНО] " << bytesRead << " байт: ";
-            for (int i = 0; i < bytesRead; i++) {
-                printf("%02X ", buffer[i]);
-            }
-            std::cout << std::endl;
+        auto currentTime = std::chrono::steady_clock::now();
+        auto timeSinceLastStatus = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastStatusTime).count();
 
+        if (timeSinceLastStatus >= 3) {
+            std::cout << "СТАН: " << successfulReads << "/" << totalReadAttempts
+                      << " спроб успішні" << std::endl;
+            lastStatusTime = currentTime;
+        }
+
+        if (bytesRead > 0) {
+            successfulReads++;
             std::vector<uint8_t> data(buffer, buffer + bytesRead);
+
+            std::cout << "ОТРИМАНО ДАНІ: " << bytesRead << " байт" << std::endl;
+
             if (dataReceived && !data.empty()) {
                 dataReceived(data);
             }
-        } else if (bytesRead == 0) {
-            // Таймаут - нормально
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        } else {
-            // Помилка
-            if (!stopRequested_) {
-                std::cerr << "[ПОМИЛКА] Читання: " << strerror(errno) << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            }
+        } else if (bytesRead < 0) {
+            std::cout << "ПОМИЛКА ЧИТАННЯ" << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     std::cout << "Потік читання зупинено" << std::endl;
@@ -330,24 +338,16 @@ void SerialReader::requestLoop() {
                 break;
         }
 
-        // ВИВІД ЗАПИТУ
-        std::cout << "[ЗАПИТ] Відправляю " << commandName << " (CMD=" << static_cast<int>(command) << ")" << std::endl;
-
-        auto request = createMSPRequest(command);
-        std::cout << "[ЗАПИТ] Дані: ";
-        for (auto byte : request) {
-            printf("%02X ", byte);
-        }
-        std::cout << std::endl;
+        std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << std::endl;
 
         if (sendMSPRequest(command)) {
-            std::cout << "[ЗАПИТ] Успішно відправлено" << std::endl;
+            std::cout << "Запит відправлено" << std::endl;
         } else {
-            std::cerr << "[ЗАПИТ] Помилка відправки" << std::endl;
+            std::cout << "Помилка відправки" << std::endl;
         }
 
         requestCounter++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Збільшимо до 1 секунди
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
     std::cout << "Потік запитів MSP зупинено" << std::endl;

@@ -162,6 +162,12 @@ int main(int argc, char *argv[]) {
 
         while (!stop) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            static int counter = 0;
+            counter++;
+            if (counter % 20 == 0) {
+                std::cout << "Програма активна" << std::endl;
+            }
         }
 
         std::cout << "Завершення роботи..." << std::endl;
