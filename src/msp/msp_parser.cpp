@@ -48,13 +48,10 @@ void MSPParser::reset() {
 
 bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
     if (message.size() < 6) {
-        std::cerr << "Повідомлення занадто коротке: " << message.size() << " байт" << std::endl;
         return false;
     }
 
-    // Перевіряємо заголовок
     if (message[0] != '$' || message[1] != 'M' || (message[2] != '<' && message[2] != '>')) {
-        std::cerr << "Невірний заголовок MSP" << std::endl;
         return false;
     }
 
@@ -64,9 +61,6 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
     size_t expectedLength = 5 + dataLength + 1;
 
     if (message.size() != expectedLength) {
-        std::cerr << "Невірна довжина повідомлення. Очікувалось: "
-                  << expectedLength << ", отримано: " << message.size()
-                  << " (dataLength=" << static_cast<int>(dataLength) << ")" << std::endl;
         return false;
     }
 
@@ -77,13 +71,10 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
 
     uint8_t receivedCrc = message.back();
     if (calculatedCrc != receivedCrc) {
-        std::cerr << "MSP CRC помилка. Очікувалось: "
-                  << static_cast<int>(calculatedCrc) << ", отримано: "
-                  << static_cast<int>(receivedCrc) << std::endl;
         return false;
     }
 
-    std::cout << "Успішно розпарсено MSP команду: " << static_cast<int>(cmd) << std::endl;
+    std::cout << "MSP команда: " << static_cast<int>(cmd) << std::endl;
 
     switch (cmd) {
         case 108: {
@@ -93,7 +84,7 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
                 attitude.pitch = static_cast<int16_t>(message[7] | (message[8] << 8)) / 10.0f;
                 attitude.yaw = static_cast<int16_t>(message[9] | (message[10] << 8));
 
-                std::cout << "Розпарсено ATTITUDE: roll=" << attitude.roll
+                std::cout << "ATTITUDE: roll=" << attitude.roll
                           << "°, pitch=" << attitude.pitch << "°, yaw=" << attitude.yaw << "°" << std::endl;
 
                 if (attitudeReceived) {
@@ -110,8 +101,8 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
                     channels.channels[i] = message[5 + i * 2] | (message[6 + i * 2] << 8);
                 }
 
-                std::cout << "Розпарсено RC_CHANNELS: " << channels.channels[0]
-                          << ", " << channels.channels[1] << ", " << channels.channels[2] << ", ..." << std::endl;
+                std::cout << "RC_CHANNELS: " << channels.channels[0]
+                          << ", " << channels.channels[1] << ", " << channels.channels[2] << std::endl;
 
                 if (rcChannelsReceived) {
                     rcChannelsReceived(channels);
@@ -128,7 +119,7 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
                 battery.capacity = message[9] | (message[10] << 8) | (message[11] << 16);
                 battery.percentage = message[12];
 
-                std::cout << "Розпарсено BATTERY: voltage=" << battery.voltage
+                std::cout << "BATTERY: voltage=" << battery.voltage
                           << "V, current=" << battery.current << "A, capacity="
                           << battery.capacity << "mAh (" << static_cast<int>(battery.percentage) << "%)" << std::endl;
 

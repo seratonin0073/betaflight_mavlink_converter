@@ -24,7 +24,6 @@ void MAVLinkBridge::packMAVLinkMessage(const mavlink_message_t& mavMsg, MAVLinkM
     msg.msgid = mavMsg.msgid;
     msg.len = mavMsg.len;
 
-    // Конвертація MAVLink повідомлення у вектор байтів
     msg.data.resize(MAVLINK_MAX_PACKET_LEN);
     uint16_t len = mavlink_msg_to_send_buffer(msg.data.data(), &mavMsg);
     msg.data.resize(len);
@@ -35,21 +34,22 @@ MAVLinkMessage MAVLinkBridge::convertAttitude(const AttitudeData& attitude) {
     mavlink_message_t mavMsg;
     mavlink_attitude_t attitudeMsg;
 
-    // Заповнення даних ATTITUDE
     attitudeMsg.time_boot_ms = getBootTimeMs() - bootTimeMs_;
-    attitudeMsg.roll = attitude.roll * M_PI / 180.0f;  // градуси -> радіани
+    attitudeMsg.roll = attitude.roll * M_PI / 180.0f;
     attitudeMsg.pitch = attitude.pitch * M_PI / 180.0f;
     attitudeMsg.yaw = attitude.yaw * M_PI / 180.0f;
-    attitudeMsg.rollspeed = 0.0f;  // Не надається MSP
+    attitudeMsg.rollspeed = 0.0f;
     attitudeMsg.pitchspeed = 0.0f;
     attitudeMsg.yawspeed = 0.0f;
 
-    // Кодування MAVLink повідомлення
     mavlink_msg_attitude_encode(systemId_, componentId_, &mavMsg, &attitudeMsg);
     packMAVLinkMessage(mavMsg, msg);
 
-    std::cout << "✅ Конвертовано ATTITUDE: "
-              << "roll=" << attitude.roll << "° -> " << attitudeMsg.roll << "rad" << std::endl;
+    std::cout << "MAVLINK ATTITUDE: ";
+    for (size_t i = 0; i < msg.data.size(); i++) {
+        printf("%02X ", msg.data[i]);
+    }
+    std::cout << std::endl;
 
     sequenceNumber_++;
     return msg;
@@ -60,11 +60,9 @@ MAVLinkMessage MAVLinkBridge::convertRCChannels(const RCChannelsData& channels) 
     mavlink_message_t mavMsg;
     mavlink_rc_channels_t rcMsg;
 
-    // Заповнення даних RC_CHANNELS - ВИПРАВЛЕНА ВЕРСІЯ
     rcMsg.time_boot_ms = getBootTimeMs() - bootTimeMs_;
     rcMsg.chancount = 16;
-    rcMsg.rssi = 255;  // Максимальний RSSI
-
+    rcMsg.rssi = 255;
 
     rcMsg.chan1_raw = channels.channels[0];
     rcMsg.chan2_raw = channels.channels[1];
@@ -84,13 +82,15 @@ MAVLinkMessage MAVLinkBridge::convertRCChannels(const RCChannelsData& channels) 
     rcMsg.chan16_raw = channels.channels[15];
     rcMsg.chan17_raw = UINT16_MAX;
     rcMsg.chan18_raw = UINT16_MAX;
-    // Кодування MAVLink повідомлення
+
     mavlink_msg_rc_channels_encode(systemId_, componentId_, &mavMsg, &rcMsg);
     packMAVLinkMessage(mavMsg, msg);
 
-    std::cout << "✅ Конвертовано RC_CHANNELS: "
-              << channels.channels[0] << ", " << channels.channels[1] << ", ..."
-              << " (RSSI: " << static_cast<int>(rcMsg.rssi) << ")" << std::endl;
+    std::cout << "MAVLINK RC_CHANNELS: ";
+    for (size_t i = 0; i < msg.data.size(); i++) {
+        printf("%02X ", msg.data[i]);
+    }
+    std::cout << std::endl;
 
     sequenceNumber_++;
     return msg;
@@ -101,7 +101,6 @@ MAVLinkMessage MAVLinkBridge::convertSystemStatus(const BatteryData& battery) {
     mavlink_message_t mavMsg;
     mavlink_sys_status_t sysMsg;
 
-    // Заповнення даних SYS_STATUS
     sysMsg.onboard_control_sensors_present =
         MAV_SYS_STATUS_SENSOR_3D_GYRO |
         MAV_SYS_STATUS_SENSOR_3D_ACCEL |
@@ -110,12 +109,10 @@ MAVLinkMessage MAVLinkBridge::convertSystemStatus(const BatteryData& battery) {
     sysMsg.onboard_control_sensors_enabled = sysMsg.onboard_control_sensors_present;
     sysMsg.onboard_control_sensors_health = sysMsg.onboard_control_sensors_present;
 
-    // Батарея
-    sysMsg.voltage_battery = battery.voltage * 1000;  // V -> mV
-    sysMsg.current_battery = battery.current * 100;   // A -> 10mA
+    sysMsg.voltage_battery = battery.voltage * 1000;
+    sysMsg.current_battery = battery.current * 100;
     sysMsg.battery_remaining = battery.percentage;
 
-    // Інші поля
     sysMsg.load = 0;
     sysMsg.voltage_battery = 0;
     sysMsg.drop_rate_comm = 0;
@@ -125,14 +122,14 @@ MAVLinkMessage MAVLinkBridge::convertSystemStatus(const BatteryData& battery) {
     sysMsg.errors_count3 = 0;
     sysMsg.errors_count4 = 0;
 
-    // Кодування MAVLink повідомлення
     mavlink_msg_sys_status_encode(systemId_, componentId_, &mavMsg, &sysMsg);
     packMAVLinkMessage(mavMsg, msg);
 
-    std::cout << "✅ Конвертовано SYS_STATUS: "
-              << "voltage=" << battery.voltage << "V, "
-              << "current=" << battery.current << "A, "
-              << "remaining=" << static_cast<int>(battery.percentage) << "%" << std::endl;
+    std::cout << "MAVLINK SYS_STATUS: ";
+    for (size_t i = 0; i < msg.data.size(); i++) {
+        printf("%02X ", msg.data[i]);
+    }
+    std::cout << std::endl;
 
     sequenceNumber_++;
     return msg;
@@ -143,30 +140,29 @@ MAVLinkMessage MAVLinkBridge::convertBatteryStatus(const BatteryData& battery) {
     mavlink_message_t mavMsg;
     mavlink_battery_status_t batMsg;
 
-    // Заповнення даних BATTERY_STATUS
-    batMsg.id = 0;  // Батарея 0
+    batMsg.id = 0;
     batMsg.battery_function = MAV_BATTERY_FUNCTION_ALL;
     batMsg.type = MAV_BATTERY_TYPE_LION;
-    batMsg.temperature = INT16_MAX;  // Не надається
-    batMsg.voltages[0] = battery.voltage * 1000;  // V -> mV
+    batMsg.temperature = INT16_MAX;
+    batMsg.voltages[0] = battery.voltage * 1000;
     for (int i = 1; i < 10; i++) {
-        batMsg.voltages[i] = UINT16_MAX;  // Невикористані
+        batMsg.voltages[i] = UINT16_MAX;
     }
-    batMsg.current_battery = battery.current * 100;  // A -> 10mA
-    batMsg.current_consumed = battery.capacity;      // mAh
-    batMsg.energy_consumed = -1;                     // Не надається
+    batMsg.current_battery = battery.current * 100;
+    batMsg.current_consumed = battery.capacity;
+    batMsg.energy_consumed = -1;
     batMsg.battery_remaining = battery.percentage;
-    batMsg.time_remaining = -1;                      // Не надається
+    batMsg.time_remaining = -1;
     batMsg.charge_state = MAV_BATTERY_CHARGE_STATE_UNDEFINED;
 
-    // Кодування MAVLink повідомлення
     mavlink_msg_battery_status_encode(systemId_, componentId_, &mavMsg, &batMsg);
     packMAVLinkMessage(mavMsg, msg);
 
-    std::cout << "✅ Конвертовано BATTERY_STATUS: "
-              << "voltage=" << battery.voltage << "V, "
-              << "current=" << battery.current << "A, "
-              << "capacity=" << battery.capacity << "mAh" << std::endl;
+    std::cout << "MAVLINK BATTERY_STATUS: ";
+    for (size_t i = 0; i < msg.data.size(); i++) {
+        printf("%02X ", msg.data[i]);
+    }
+    std::cout << std::endl;
 
     sequenceNumber_++;
     return msg;

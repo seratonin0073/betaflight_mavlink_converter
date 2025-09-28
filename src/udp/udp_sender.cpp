@@ -57,7 +57,10 @@ private:
 
 UDPSender::UDPSender(const std::string& host, int port) {
     socketImpl_ = new UDPSenderImpl(host, port);
-    static_cast<UDPSenderImpl*>(socketImpl_)->connect();
+    bool connected = static_cast<UDPSenderImpl*>(socketImpl_)->connect();
+    if (!connected) {
+        std::cout << "Помилка підключення UDP" << std::endl;
+    }
 }
 
 UDPSender::~UDPSender() {
@@ -70,6 +73,15 @@ bool UDPSender::isConnected() const {
 }
 
 void UDPSender::sendMAVLinkMessage(const MAVLinkMessage& message) {
+    if (!isConnected()) {
+        std::cout << "UDP не підключено" << std::endl;
+        return;
+    }
 
-    std::cout << "Відправка MAVLink повідомлення через UDP" << std::endl;
+    bool success = static_cast<UDPSenderImpl*>(socketImpl_)->send(message.data.data(), message.data.size());
+    if (success) {
+        std::cout << "Відправлено MAVLink через UDP: " << message.data.size() << " байт" << std::endl;
+    } else {
+        std::cout << "Помилка відправки MAVLink через UDP" << std::endl;
+    }
 }

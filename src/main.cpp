@@ -98,7 +98,6 @@ int main(int argc, char *argv[]) {
             mspParser->processData(data);
         };
 
-        // Обробник розпарсених даних ATTITUDE
         mspParser->attitudeReceived = [&](const AttitudeData& attitude) {
             std::cout << "[ATTITUDE] roll=" << attitude.roll << " pitch=" << attitude.pitch << " yaw=" << attitude.yaw << std::endl;
 
@@ -110,7 +109,6 @@ int main(int argc, char *argv[]) {
             }
         };
 
-        // Обробник розпарсених даних RC CHANNELS
         mspParser->rcChannelsReceived = [&](const RCChannelsData& channels) {
             std::cout << "[RC_CHANNELS] ";
             for (int i = 0; i < 4; i++) {
@@ -126,7 +124,6 @@ int main(int argc, char *argv[]) {
             }
         };
 
-        // Обробник розпарсених даних BATTERY
         mspParser->batteryStateReceived = [&](const BatteryData& battery) {
             std::cout << "[BATTERY] voltage=" << battery.voltage << "V current=" << battery.current << "A capacity=" << battery.capacity << "mAh" << std::endl;
 
@@ -140,8 +137,6 @@ int main(int argc, char *argv[]) {
                 udpSender->sendMAVLinkMessage(batteryMsg);
             }
         };
-
-
 
         if (enableEmulation) {
             std::cout << "Запуск емуляції даних..." << std::endl;
