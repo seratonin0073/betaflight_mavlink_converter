@@ -8,7 +8,6 @@
 #include <cstring>
 #include <algorithm>
 
-// Реалізація SerialImpl з виправленнями
 class SerialImpl {
 public:
     SerialImpl(const std::string& port, int baudrate)
@@ -272,23 +271,24 @@ void SerialReader::readLoop() {
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
 
         if (bytesRead > 0) {
-            std::vector<uint8_t> data(buffer, buffer + bytesRead);
-
-            std::cout << "Отримано " << bytesRead << " байт: ";
-            for (int i = 0; i < std::min(bytesRead, 8); i++) {
+            // ВИВІД ОТРИМАНИХ ДАНИХ
+            std::cout << "[ОТРИМАНО] " << bytesRead << " байт: ";
+            for (int i = 0; i < bytesRead; i++) {
                 printf("%02X ", buffer[i]);
             }
-            if (bytesRead > 8) std::cout << "...";
             std::cout << std::endl;
 
+            std::vector<uint8_t> data(buffer, buffer + bytesRead);
             if (dataReceived && !data.empty()) {
                 dataReceived(data);
             }
         } else if (bytesRead == 0) {
+            // Таймаут - нормально
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         } else {
+            // Помилка
             if (!stopRequested_) {
-                std::cerr << "Критична помилка читання, перезапуск..." << std::endl;
+                std::cerr << "[ПОМИЛКА] Читання: " << strerror(errno) << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
@@ -298,7 +298,7 @@ void SerialReader::readLoop() {
 }
 
 void SerialReader::requestLoop() {
-    //std::cout << "Потік запитів MSP запущено" << std::endl;
+    std::cout << "Потік запитів MSP запущено" << std::endl;
 
     const uint8_t MSP_ATTITUDE = 108;
     const uint8_t MSP_RC = 105;
@@ -330,17 +330,24 @@ void SerialReader::requestLoop() {
                 break;
         }
 
-      /*  std::cout << "↗ Відправка MSP запиту: " << commandName
-                  << " (CMD=" << static_cast<int>(command) << ")" << std::endl;*/
+        // ВИВІД ЗАПИТУ
+        std::cout << "[ЗАПИТ] Відправляю " << commandName << " (CMD=" << static_cast<int>(command) << ")" << std::endl;
+
+        auto request = createMSPRequest(command);
+        std::cout << "[ЗАПИТ] Дані: ";
+        for (auto byte : request) {
+            printf("%02X ", byte);
+        }
+        std::cout << std::endl;
 
         if (sendMSPRequest(command)) {
-            std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
+            std::cout << "[ЗАПИТ] Успішно відправлено" << std::endl;
         } else {
-            std::cerr << "Не вдалося відправити запит " << commandName << std::endl;
+            std::cerr << "[ЗАПИТ] Помилка відправки" << std::endl;
         }
 
         requestCounter++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Збільшимо до 1 секунди
     }
 
     std::cout << "Потік запитів MSP зупинено" << std::endl;

@@ -94,69 +94,54 @@ int main(int argc, char *argv[]) {
         }
 
         serialReader->dataReceived = [&](const std::vector<uint8_t>& data) {
-            std::cout << "СИРІ ДАНІ: " << data.size() << " байт: ";
-            for (size_t i = 0; i < std::min(data.size(), size_t(10)); i++) {
-                printf("%02X ", data[i]);
-            }
-            if (data.size() > 10) std::cout << "...";
-            std::cout << std::endl;
-
+            std::cout << "[СИРІ ДАНІ] " << data.size() << " байт отримано для парсингу" << std::endl;
             mspParser->processData(data);
         };
 
+        // Обробник розпарсених даних ATTITUDE
         mspParser->attitudeReceived = [&](const AttitudeData& attitude) {
-            std::cout << "[MSP] ATTITUDE:" << std::endl;
-            std::cout << "  roll=" << attitude.roll << "°" << std::endl;
-            std::cout << "  pitch=" << attitude.pitch << "°" << std::endl;
-            std::cout << "  yaw=" << attitude.yaw << "°" << std::endl;
+            std::cout << "[ATTITUDE] roll=" << attitude.roll << " pitch=" << attitude.pitch << " yaw=" << attitude.yaw << std::endl;
 
             auto mavMsg = mavlinkBridge->convertAttitude(attitude);
-            std::cout << "[MAVLink] ATTITUDE пакет" << std::endl;
-            std::cout << "  ID: " << static_cast<int>(mavMsg.msgid) << std::endl;
-            std::cout << "  Розмір: " << static_cast<int>(mavMsg.len) << " байт" << std::endl;
+            std::cout << "[MAVLINK] Створено ATTITUDE пакет" << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(mavMsg);
             }
         };
 
+        // Обробник розпарсених даних RC CHANNELS
         mspParser->rcChannelsReceived = [&](const RCChannelsData& channels) {
-            std::cout << "[MSP] RC_CHANNELS:" << std::endl;
-            std::cout << "  Канали: ";
+            std::cout << "[RC_CHANNELS] ";
             for (int i = 0; i < 4; i++) {
-                std::cout << channels.channels[i];
-                if (i < 3) std::cout << ", ";
+                std::cout << channels.channels[i] << " ";
             }
             std::cout << std::endl;
 
             auto mavMsg = mavlinkBridge->convertRCChannels(channels);
-            std::cout << "[MAVLink] RC_CHANNELS пакет" << std::endl;
-            std::cout << "  ID: " << static_cast<int>(mavMsg.msgid) << std::endl;
+            std::cout << "[MAVLINK] Створено RC_CHANNELS пакет" << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(mavMsg);
             }
         };
 
+        // Обробник розпарсених даних BATTERY
         mspParser->batteryStateReceived = [&](const BatteryData& battery) {
-            std::cout << "[MSP] BATTERY:" << std::endl;
-            std::cout << "  Напруга: " << battery.voltage << "V" << std::endl;
-            std::cout << "  Струм: " << battery.current << "A" << std::endl;
-            std::cout << "  Ємність: " << battery.capacity << "mAh" << std::endl;
-            std::cout << "  Заряд: " << static_cast<int>(battery.percentage) << "%" << std::endl;
+            std::cout << "[BATTERY] voltage=" << battery.voltage << "V current=" << battery.current << "A capacity=" << battery.capacity << "mAh" << std::endl;
 
             auto statusMsg = mavlinkBridge->convertSystemStatus(battery);
             auto batteryMsg = mavlinkBridge->convertBatteryStatus(battery);
 
-            std::cout << "[MAVLink] Два пакети:" << std::endl;
-            std::cout << "  SYS_STATUS (ID: " << static_cast<int>(statusMsg.msgid) << ")" << std::endl;
-            std::cout << "  BATTERY_STATUS (ID: " << static_cast<int>(batteryMsg.msgid) << ")" << std::endl;
+            std::cout << "[MAVLINK] Створено SYS_STATUS та BATTERY_STATUS пакети" << std::endl;
 
             if (udpSender && udpSender->isConnected()) {
                 udpSender->sendMAVLinkMessage(statusMsg);
                 udpSender->sendMAVLinkMessage(batteryMsg);
             }
         };
+
+
 
         if (enableEmulation) {
             std::cout << "Запуск емуляції даних..." << std::endl;
