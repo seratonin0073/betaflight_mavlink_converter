@@ -1,13 +1,13 @@
 # ninja log v6
-1	189	1758657348884266025	CMakeFiles/betaflight_mavlink_converter.dir/src/mavlink/mavlink_bridge.cpp.o	55fb663640cd9b72
-1	209	1758657348884700194	CMakeFiles/betaflight_mavlink_converter.dir/src/udp/udp_sender.cpp.o	f54c7165d1dff4f0
-1	266	1758657348883092367	CMakeFiles/betaflight_mavlink_converter.dir/src/msp/msp_parser.cpp.o	21cbb713fecdd1a1
-1	434	1758657348884429470	CMakeFiles/betaflight_mavlink_converter.dir/src/serial/serial_reader.cpp.o	28f8613d9173521
-1	454	1758657348884800752	CMakeFiles/betaflight_mavlink_converter.dir/src/main.cpp.o	aa5a75449d8d49ae
-2	47	1758658714273184557	betaflight_mavlink_converter	69fe491742d6182b
-1	265	1758738050583353928	CMakeFiles/betaflight_mavlink_converter.dir/src/msp/msp_parser.cpp.o	21cbb713fecdd1a1
-2	442	1758738050585442215	CMakeFiles/betaflight_mavlink_converter.dir/src/serial/serial_reader.cpp.o	28f8613d9173521
-2	476	1758738050585622292	CMakeFiles/betaflight_mavlink_converter.dir/src/udp/udp_sender.cpp.o	f54c7165d1dff4f0
-1	544	1758738050585181002	CMakeFiles/betaflight_mavlink_converter.dir/src/mavlink/mavlink_bridge.cpp.o	55fb663640cd9b72
+2	53	1758970049279995932	betaflight_mavlink_converter	69fe491742d6182b
 2	741	1758738050585866614	CMakeFiles/betaflight_mavlink_converter.dir/src/main.cpp.o	aa5a75449d8d49ae
-743	791	1758738051325350654	betaflight_mavlink_converter	69fe491742d6182b
+2	442	1758738050585442215	CMakeFiles/betaflight_mavlink_converter.dir/src/serial/serial_reader.cpp.o	28f8613d9173521
+1	265	1758738050583353928	CMakeFiles/betaflight_mavlink_converter.dir/src/msp/msp_parser.cpp.o	21cbb713fecdd1a1
+2	476	1758738050585622292	CMakeFiles/betaflight_mavlink_converter.dir/src/udp/udp_sender.cpp.o	f54c7165d1dff4f0
+4	529	1758963770214041739	CMakeFiles/betaflight_mavlink_converter.dir/src/mavlink/mavlink_bridge.cpp.o	55fb663640cd9b72
+1	95	1759066958667721355	build.ninja	aa90546cdc02ee39
+1	95	1759066958667721355	/home/danylo/CLionProjects/betaflight-mavlink-converter/cmake-build-debug/cmake_install.cmake	aa90546cdc02ee39
+6	838	1759066958680748314	CMakeFiles/betaflight_mavlink_converter.dir/src/main.cpp.o	aa5a75449d8d49ae
+2	514	1759067233513618818	CMakeFiles/betaflight_mavlink_converter.dir/src/serial/serial_reader.cpp.o	28f8613d9173521
+3	843	1759067233514618814	CMakeFiles/betaflight_mavlink_converter.dir/src/main.cpp.o	aa5a75449d8d49ae
+850	901	1759067234361615307	betaflight_mavlink_converter	69fe491742d6182b
