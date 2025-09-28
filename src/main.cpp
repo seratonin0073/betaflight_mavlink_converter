@@ -28,7 +28,7 @@ void printHelp() {
     std::cout << "  --help             Показати цю довідку" << std::endl;
     std::cout << std::endl;
     std::cout << "Приклади:" << std::endl;
-    std::cout << "  ./bfmavconverter --device /dev/ttyUSB0 --baud 115200 --udp" << std::endl;
+    std::cout << "  ./betaflight_mavlink_converter --device /dev/ttyAMA0 --baud 115200 --udp" << std::endl;
     std::cout << "  ./bfmavconverter --emulate --udp  (режим емуляції)" << std::endl;
     std::cout << "  ./bfmavconverter --help" << std::endl;
 }

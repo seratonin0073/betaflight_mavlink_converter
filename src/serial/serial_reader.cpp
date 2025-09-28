@@ -216,7 +216,6 @@ bool SerialReader::isConnected() const {
     return serialImpl_ && serialImpl_->isOpen();
 }
 
-// ВИПРАВЛЕНА ВЕРСІЯ writeData
 bool SerialReader::writeData(const std::vector<uint8_t>& data) {
     if (!serialImpl_ || !serialImpl_->isOpen()) {
         std::cerr << "Порт не відкритий" << std::endl;
@@ -335,7 +334,7 @@ void SerialReader::requestLoop() {
                   << " (CMD=" << static_cast<int>(command) << ")" << std::endl;*/
 
         if (sendMSPRequest(command)) {
-            //std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
+            std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
         } else {
             std::cerr << "Не вдалося відправити запит " << commandName << std::endl;
         }
