@@ -20,11 +20,9 @@ public:
     bool isReading() const;
     void enableEmulation();
 
-    // Функції для відправки даних
     bool writeData(const std::vector<uint8_t>& data);
     bool sendMSPRequest(uint8_t command);
 
-    // Діагностичні функції
     std::string getPortName() const { return port_; }
     int getBaudrate() const { return baudrate_; }
     bool isConnected() const;

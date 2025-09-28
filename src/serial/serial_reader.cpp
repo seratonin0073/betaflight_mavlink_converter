@@ -21,14 +21,14 @@ public:
     bool open() {
         fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
         if (fd_ < 0) {
-            std::cerr << "❌ Не вдалося відкрити порт " << port_
+            std::cerr << "Не вдалося відкрити порт " << port_
                       << ": " << strerror(errno) << std::endl;
             return false;
         }
 
         struct termios tty;
         if (tcgetattr(fd_, &tty) != 0) {
-            std::cerr << "❌ Помилка tcgetattr: " << strerror(errno) << std::endl;
+            std::cerr << "Помилка tcgetattr: " << strerror(errno) << std::endl;
             close();
             return false;
         }
@@ -46,7 +46,7 @@ public:
             case 921600: speed = B921600; break;
             case 1000000: speed = B1000000; break;
             default:
-                std::cerr << "⚠️  Невідома швидкість " << baudrate_
+                std::cerr << "Невідома швидкість " << baudrate_
                           << ", використовую 115200" << std::endl;
                 speed = B115200;
                 break;
@@ -69,14 +69,14 @@ public:
         tty.c_cflag &= ~CRTSCTS;
 
         if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
-            std::cerr << "❌ Помилка tcsetattr: " << strerror(errno) << std::endl;
+            std::cerr << "Помилка tcsetattr: " << strerror(errno) << std::endl;
             close();
             return false;
         }
 
         tcflush(fd_, TCIOFLUSH);
 
-        std::cout << "✅ Послідовний порт " << port_
+        std::cout << "Послідовний порт " << port_
                   << " відкрито на " << baudrate_ << " бод" << std::endl;
         return true;
     }
@@ -94,7 +94,7 @@ public:
         ssize_t bytesRead = ::read(fd_, buffer, size);
         if (bytesRead < 0) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                std::cerr << "❌ Помилка читання з порту: " << strerror(errno) << std::endl;
+                std::cerr << "Помилка читання з порту: " << strerror(errno) << std::endl;
             }
             return -1;
         }
@@ -102,22 +102,20 @@ public:
         return bytesRead;
     }
 
-    // ДОДАЄМО ПУБЛІЧНИЙ МЕТОД ДЛЯ ЗАПИСУ
     int writeData(const uint8_t* buffer, size_t size) {
         if (fd_ < 0) {
-            std::cerr << "❌ Порт не відкритий для запису" << std::endl;
+            std::cerr << "Порт не відкритий для запису" << std::endl;
             return -1;
         }
 
         ssize_t bytesWritten = ::write(fd_, buffer, size);
         if (bytesWritten < 0) {
-            std::cerr << "❌ Помилка запису в порт: " << strerror(errno) << std::endl;
+            std::cerr << " Помилка запису в порт: " << strerror(errno) << std::endl;
             return -1;
         }
 
-        // Чекаємо, поки всі дані будуть відправлені
         if (tcdrain(fd_) != 0) {
-            std::cerr << "❌ Помилка tcdrain: " << strerror(errno) << std::endl;
+            std::cerr << "Помилка tcdrain: " << strerror(errno) << std::endl;
         }
 
         return bytesWritten;
@@ -127,7 +125,6 @@ public:
         return fd_ >= 0;
     }
 
-    // ДОДАЄМО ПУБЛІЧНИЙ ГЕТТЕР ДЛЯ FD
     int getFd() const { return fd_; }
 
 private:
@@ -136,7 +133,6 @@ private:
     int baudrate_;
 };
 
-// Реалізація SerialReader
 
 SerialReader::SerialReader(const std::string& port, int baudrate)
     : port_(port), baudrate_(baudrate), stopRequested_(false) {
@@ -150,14 +146,14 @@ SerialReader::SerialReader(const std::string& port, int baudrate)
         for (int i = 0; possible_ports[i] != nullptr; i++) {
             if (access(possible_ports[i], F_OK) != -1) {
                 port_ = possible_ports[i];
-                std::cout << "🔍 Автовизначено порт: " << port_ << std::endl;
+                std::cout << "Автовизначено порт: " << port_ << std::endl;
                 break;
             }
         }
 
         if (port_.empty()) {
             port_ = "/dev/ttyAMA0";
-            std::cout << "⚠️  Порт не визначено, використовую " << port_ << std::endl;
+            std::cout << "Порт не визначено, використовую " << port_ << std::endl;
         }
     }
 }
@@ -168,13 +164,13 @@ SerialReader::~SerialReader() {
 
 bool SerialReader::startReading() {
     if (isReading()) {
-        std::cout << "⚠️  Читання вже запущено" << std::endl;
+        std::cout << "Читання вже запущено" << std::endl;
         return true;
     }
 
     serialImpl_ = std::make_unique<SerialImpl>(port_, baudrate_);
     if (!serialImpl_->open()) {
-        std::cerr << "❌ Не вдалося відкрити порт: " << port_ << std::endl;
+        std::cerr << "Не вдалося відкрити порт: " << port_ << std::endl;
         serialImpl_.reset();
         return false;
     }
@@ -189,7 +185,7 @@ bool SerialReader::startReading() {
         requestLoop();
     });
 
-    std::cout << "✅ Запущено читання з порту: " << port_ << std::endl;
+    std::cout << "Запущено читання з порту: " << port_ << std::endl;
     return true;
 }
 
@@ -209,7 +205,7 @@ void SerialReader::stopReading() {
         serialImpl_.reset();
     }
 
-    std::cout << "⏹️  Читання з порту зупинено" << std::endl;
+    std::cout << "Читання з порту зупинено" << std::endl;
 }
 
 bool SerialReader::isReading() const {
@@ -223,12 +219,12 @@ bool SerialReader::isConnected() const {
 // ВИПРАВЛЕНА ВЕРСІЯ writeData
 bool SerialReader::writeData(const std::vector<uint8_t>& data) {
     if (!serialImpl_ || !serialImpl_->isOpen()) {
-        std::cerr << "❌ Порт не відкритий" << std::endl;
+        std::cerr << "Порт не відкритий" << std::endl;
         return false;
     }
 
     if (data.empty()) {
-        std::cerr << "❌ Немає даних для відправки" << std::endl;
+        std::cerr << "Немає даних для відправки" << std::endl;
         return false;
     }
 
@@ -238,12 +234,12 @@ bool SerialReader::writeData(const std::vector<uint8_t>& data) {
     int bytesWritten = serialImpl_->writeData(data.data(), data.size());
 
     if (bytesWritten != static_cast<int>(data.size())) {
-        std::cerr << "❌ Відправлено не всі дані: " << bytesWritten
+        std::cerr << "Відправлено не всі дані: " << bytesWritten
                   << "/" << data.size() << " байт" << std::endl;
         return false;
     }
 
-    std::cout << "✅ Успішно відправлено " << bytesWritten << " байт" << std::endl;
+    std::cout << "Успішно відправлено " << bytesWritten << " байт" << std::endl;
     return true;
 }
 
@@ -271,7 +267,7 @@ bool SerialReader::sendMSPRequest(uint8_t command) {
 
 void SerialReader::readLoop() {
     uint8_t buffer[256];
-    std::cout << "📡 Потік читання запущено" << std::endl;
+    std::cout << "Потік читання запущено" << std::endl;
 
     while (!stopRequested_ && serialImpl_ && serialImpl_->isOpen()) {
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
@@ -279,7 +275,7 @@ void SerialReader::readLoop() {
         if (bytesRead > 0) {
             std::vector<uint8_t> data(buffer, buffer + bytesRead);
 
-            std::cout << "📥 Отримано " << bytesRead << " байт: ";
+            std::cout << "Отримано " << bytesRead << " байт: ";
             for (int i = 0; i < std::min(bytesRead, 8); i++) {
                 printf("%02X ", buffer[i]);
             }
@@ -293,17 +289,17 @@ void SerialReader::readLoop() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         } else {
             if (!stopRequested_) {
-                std::cerr << "❌ Критична помилка читання, перезапуск..." << std::endl;
+                std::cerr << "Критична помилка читання, перезапуск..." << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
         }
     }
 
-    std::cout << "📡 Потік читання зупинено" << std::endl;
+    std::cout << "Потік читання зупинено" << std::endl;
 }
 
 void SerialReader::requestLoop() {
-    std::cout << "🔄 Потік запитів MSP запущено" << std::endl;
+    //std::cout << "Потік запитів MSP запущено" << std::endl;
 
     const uint8_t MSP_ATTITUDE = 108;
     const uint8_t MSP_RC = 105;
@@ -335,28 +331,28 @@ void SerialReader::requestLoop() {
                 break;
         }
 
-        std::cout << "↗ Відправка MSP запиту: " << commandName
-                  << " (CMD=" << static_cast<int>(command) << ")" << std::endl;
+      /*  std::cout << "↗ Відправка MSP запиту: " << commandName
+                  << " (CMD=" << static_cast<int>(command) << ")" << std::endl;*/
 
         if (sendMSPRequest(command)) {
-            std::cout << "✅ Запит " << commandName << " відправлено успішно" << std::endl;
+            //std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
         } else {
-            std::cerr << "❌ Не вдалося відправити запит " << commandName << std::endl;
+            std::cerr << "Не вдалося відправити запит " << commandName << std::endl;
         }
 
         requestCounter++;
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
 
-    std::cout << "🔄 Потік запитів MSP зупинено" << std::endl;
+    std::cout << "Потік запитів MSP зупинено" << std::endl;
 }
 
 void SerialReader::enableEmulation() {
     stopReading();
     stopRequested_ = false;
 
-    std::cout << "🎮 === РЕЖИМ ЕМУЛЯЦІЇ АКТИВОВАНО ===" << std::endl;
-    std::cout << "🎮 Генерація тестових даних Betaflight MSP..." << std::endl;
+    std::cout << "=== РЕЖИМ ЕМУЛЯЦІЇ АКТИВОВАНО ===" << std::endl;
+    std::cout << "Генерація тестових даних Betaflight MSP..." << std::endl;
 
     readThread_ = std::thread([this]() {
         emulateData();
@@ -364,7 +360,7 @@ void SerialReader::enableEmulation() {
 }
 
 void SerialReader::emulateData() {
-    std::cout << "🎮 Потік емуляції даних запущено" << std::endl;
+    std::cout << "Потік емуляції даних запущено" << std::endl;
 
     int counter = 0;
     while (!stopRequested_) {
