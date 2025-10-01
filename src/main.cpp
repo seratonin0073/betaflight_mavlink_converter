@@ -179,12 +179,48 @@ int main(int argc, char *argv[]) {
 }*/
 
 #include <iostream>
+#include <vector>
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
-#include <vector>
 #include <cstring>
 #include <atomic>
+
+std::vector<std::string> ports = {
+    "/dev/ttyAMA0", "/dev/ttyS0", "/dev/serial0",
+    "/dev/ttyUSB0", "/dev/ttyACM0"
+};
+
+int openSerial(const std::string& port, int baud) {
+    int fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) return -1;
+
+    struct termios tty;
+    if (tcgetattr(fd, &tty) != 0) {
+        ::close(fd);
+        return -1;
+    }
+
+    speed_t speed = B115200;
+    cfsetospeed(&tty, speed);
+    cfsetispeed(&tty, speed);
+
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+    tty.c_iflag &= ~IGNBRK;
+    tty.c_lflag = 0;
+    tty.c_oflag = 0;
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_cflag |= (CLOCAL | CREAD);
+    tty.c_cflag &= ~(PARENB | PARODD);
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cc[VMIN] = 0;
+    tty.c_cc[VTIME] = 10; // 1 секунди таймаут
+
+    tcsetattr(fd, TCSANOW, &tty);
+    tcflush(fd, TCIOFLUSH);
+
+    return fd;
+}
 
 std::vector<uint8_t> createMSPRequest(uint8_t cmd) {
     std::vector<uint8_t> req = {'$', 'M', '<', 0, cmd};
@@ -194,45 +230,44 @@ std::vector<uint8_t> createMSPRequest(uint8_t cmd) {
     return req;
 }
 
-int main() {
-    const char* port = "/dev/serial0";
-    int baud = B115200;
-
-    int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
-    if (fd < 0) { perror("open"); return 1; }
-
-    struct termios tty;
-    memset(&tty, 0, sizeof tty);
-    if (tcgetattr(fd, &tty) != 0) { perror("tcgetattr"); return 1; }
-
-    cfsetospeed(&tty, baud);
-    cfsetispeed(&tty, baud);
-    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
-    tty.c_cflag |= (CLOCAL | CREAD);
-    tty.c_cflag &= ~(PARENB | PARODD);
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
-    tty.c_lflag = 0;
-    tty.c_oflag = 0;
-    tty.c_cc[VMIN] = 0;
-    tty.c_cc[VTIME] = 10;
-    if (tcsetattr(fd, TCSANOW, &tty) != 0) { perror("tcsetattr"); return 1; }
-
-    std::vector<uint8_t> req = createMSPRequest(105);
-
-    write(fd, req.data(), req.size());
-    tcdrain(fd);
-
-    uint8_t buf[256];
-    int n = read(fd, buf, sizeof(buf));
+bool readResponse(int fd) {
+    uint8_t buffer[256];
+    int n = read(fd, buffer, sizeof(buffer));
     if (n > 0) {
         std::cout << "Отримано " << n << " байт: ";
-        for (int i = 0; i < n; i++) printf("%02X ", buf[i]);
+        for (int i = 0; i < n; i++) printf("%02X ", buffer[i]);
         std::cout << std::endl;
-    } else {
-        std::cout << "Немає відповіді" << std::endl;
+        return true;
+    }
+    return false;
+}
+
+int main() {
+    uint8_t MSP_STATUS = 101;
+    uint8_t MSP_RAW_IMU = 102;
+
+    for (auto& port : ports) {
+        std::cout << "Перевірка порту: " << port << std::endl;
+        int fd = openSerial(port, 115200);
+        if (fd < 0) {
+            std::cout << "Не вдалося відкрити порт\n";
+            continue;
+        }
+
+        auto req = createMSPRequest(MSP_STATUS);
+        write(fd, req.data(), req.size());
+        tcdrain(fd);
+
+        usleep(500000); // 0.5 сек
+
+        if (readResponse(fd)) {
+            std::cout << "=== Порт " << port << " відповідає MSP ===\n";
+        } else {
+            std::cout << "Немає відповіді на MSP_STATUS\n";
+        }
+
+        ::close(fd);
     }
 
-    close(fd);
     return 0;
 }
