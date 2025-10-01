@@ -321,14 +321,7 @@ void SerialReader::readLoop() {
             }
 
             waitingForResponse = false;
-
-            auto currentTime = std::chrono::steady_clock::now();
-            auto timeSinceLastRequest = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastRequestTime);
-
-            if (timeSinceLastRequest.count() >= 1) {
-                sendNextRequest();
-                lastRequestTime = currentTime;
-            }
+            sendNextRequest();
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
