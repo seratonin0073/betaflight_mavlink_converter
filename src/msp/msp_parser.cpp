@@ -8,6 +8,14 @@ MSPParser::MSPParser()
 }
 
 void MSPParser::processData(const std::vector<uint8_t>& data) {
+    std::cout << "Розмір: " << data.size() << " байт" << std::endl;
+    std::cout << "HEX: ";
+    for (size_t i = 0; i < std::min(data.size(), size_t(16)); i++) {
+        printf("%02X ", data[i]);
+    }
+    if (data.size() > 16) std::cout << "...";
+    std::cout << std::endl;
+
     for (uint8_t byte : data) {
         if (!inMessage_) {
             if (byte == '$') {
