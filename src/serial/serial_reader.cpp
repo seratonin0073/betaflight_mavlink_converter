@@ -292,19 +292,17 @@ void SerialReader::readLoop() {
     uint8_t buffer[256];
     std::cout << "Потік читання запущено" << std::endl;
 
-    int totalReadAttempts = 0;
-    int successfulReads = 0;
+    auto lastRequestTime = std::chrono::steady_clock::now();
 
     sendNextRequest();
 
     while (!stopRequested_ && serialImpl_ && serialImpl_->isOpen()) {
-        totalReadAttempts++;
-
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
 
         if (bytesRead > 0) {
-            successfulReads++;
             std::vector<uint8_t> data(buffer, buffer + bytesRead);
+
+            bool isMSPResponse = (bytesRead >= 3 && buffer[0] == '$' && buffer[1] == 'M' && buffer[2] == '>');
 
             std::cout << "ОТРИМАНО ВІДПОВІДЬ: " << bytesRead << " байт" << std::endl;
             std::cout << "HEX: ";
@@ -314,17 +312,23 @@ void SerialReader::readLoop() {
             if (bytesRead > 16) std::cout << "...";
             std::cout << std::endl;
 
-            if (dataReceived && !data.empty()) {
-                dataReceived(data);
+            if (isMSPResponse) {
+                if (dataReceived && !data.empty()) {
+                    dataReceived(data);
+                }
+            } else {
+                std::cout << "НЕ MSP ВІДПОВІДЬ" << std::endl;
             }
 
             waitingForResponse = false;
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            sendNextRequest();
 
-        } else if (bytesRead < 0) {
-            std::cout << "ПОМИЛКА ЧИТАННЯ" << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            auto currentTime = std::chrono::steady_clock::now();
+            auto timeSinceLastRequest = std::chrono::duration_cast<std::chrono::seconds>(currentTime - lastRequestTime);
+
+            if (timeSinceLastRequest.count() >= 1) {
+                sendNextRequest();
+                lastRequestTime = currentTime;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
