@@ -163,28 +163,20 @@ SerialReader::~SerialReader() {
 
 bool SerialReader::startReading() {
     if (isReading()) {
-        std::cout << "Читання вже запущено" << std::endl;
         return true;
     }
 
     serialImpl_ = std::make_unique<SerialImpl>(port_, baudrate_);
     if (!serialImpl_->open()) {
-        std::cerr << "Не вдалося відкрити порт: " << port_ << std::endl;
         serialImpl_.reset();
         return false;
     }
 
     stopRequested_ = false;
-
     readThread_ = std::thread([this]() {
         readLoop();
     });
 
-    requestThread_ = std::thread([this]() {
-        requestLoop();
-    });
-
-    std::cout << "Запущено читання з порту: " << port_ << std::endl;
     return true;
 }
 
@@ -292,19 +284,13 @@ void SerialReader::readLoop() {
     uint8_t buffer[256];
     std::cout << "Потік читання запущено" << std::endl;
 
-    auto lastRequestTime = std::chrono::steady_clock::now();
-
-    sendNextRequest();
-
     while (!stopRequested_ && serialImpl_ && serialImpl_->isOpen()) {
         int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
 
         if (bytesRead > 0) {
             std::vector<uint8_t> data(buffer, buffer + bytesRead);
 
-            bool isMSPResponse = (bytesRead >= 3 && buffer[0] == '$' && buffer[1] == 'M' && buffer[2] == '>');
-
-            std::cout << "ОТРИМАНО ВІДПОВІДЬ: " << bytesRead << " байт" << std::endl;
+            std::cout << "ОТРИМАНО ДАНІ: " << bytesRead << " байт" << std::endl;
             std::cout << "HEX: ";
             for (int i = 0; i < std::min(bytesRead, 16); i++) {
                 printf("%02X ", buffer[i]);
@@ -312,16 +298,9 @@ void SerialReader::readLoop() {
             if (bytesRead > 16) std::cout << "...";
             std::cout << std::endl;
 
-            if (isMSPResponse) {
-                if (dataReceived && !data.empty()) {
-                    dataReceived(data);
-                }
-            } else {
-                std::cout << "НЕ MSP ВІДПОВІДЬ" << std::endl;
+            if (dataReceived && !data.empty()) {
+                dataReceived(data);
             }
-
-            waitingForResponse = false;
-            sendNextRequest();
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
