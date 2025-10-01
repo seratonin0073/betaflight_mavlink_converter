@@ -263,28 +263,29 @@ bool SerialReader::sendMSPRequest(uint8_t command) {
     return writeData(request);
 }
 
-    void SerialReader::sendNextRequest() {
-        if (!serialImpl_ || !serialImpl_->isOpen() || waitingForResponse) {
-            return;
-        }
-
-        const uint8_t commands[] = {108, 105, 130};
-        const char* commandNames[] = {"ATTITUDE", "RC_CHANNELS", "BATTERY_STATE"};
-
-        currentCommand = commands[requestCounter % 3];
-        std::string commandName = commandNames[requestCounter % 3];
-
-        std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << " (CMD=" << static_cast<int>(currentCommand) << ")" << std::endl;
-
-        if (sendMSPRequest(currentCommand)) {
-            waitingForResponse = true;
-            std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
-        } else {
-            std::cout << "Помилка відправки запиту " << commandName << std::endl;
-        }
-
-        requestCounter++;
+void SerialReader::sendNextRequest() {
+    if (!serialImpl_ || !serialImpl_->isOpen() || waitingForResponse) {
+        return;
     }
+
+    const uint8_t commands[] = {108, 105, 130};
+    const char* commandNames[] = {"ATTITUDE", "RC_CHANNELS", "BATTERY_STATE"};
+
+    currentCommand = commands[requestCounter % 3];
+    std::string commandName = commandNames[requestCounter % 3];
+
+    std::cout << "========================================" << std::endl;
+    std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << " (CMD=" << static_cast<int>(currentCommand) << ")" << std::endl;
+
+    if (sendMSPRequest(currentCommand)) {
+        waitingForResponse = true;
+        std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
+    } else {
+        std::cout << "Помилка відправки запиту " << commandName << std::endl;
+    }
+
+    requestCounter++;
+}
 
 
 void SerialReader::readLoop() {
