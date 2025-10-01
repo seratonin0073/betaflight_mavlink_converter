@@ -292,10 +292,9 @@ void SerialReader::readLoop() {
 
             std::cout << "ОТРИМАНО ДАНІ: " << bytesRead << " байт" << std::endl;
             std::cout << "HEX: ";
-            for (int i = 0; i < std::min(bytesRead, 16); i++) {
+            for (int i = 0; i < bytesRead; i++) {
                 printf("%02X ", buffer[i]);
             }
-            if (bytesRead > 16) std::cout << "...";
             std::cout << std::endl;
 
             if (dataReceived && !data.empty()) {
