@@ -1,75 +1,51 @@
 #include "msp_parser.h"
 #include <iostream>
 #include <cstring>
+#include <algorithm>
 
-MSPParser::MSPParser()
-    : inMessage_(false), expectedLength_(0) {
-    buffer_.reserve(256);
+MSPParser::MSPParser() {
+    rxBuffer_.reserve(BUFFER_SIZE);
 }
 
 void MSPParser::processData(const std::vector<uint8_t>& data) {
-    std::cout << "Розмір: " << data.size() << " байт" << std::endl;
-    std::cout << "HEX: ";
-    for (size_t i = 0; i < data.size(); i++) {
-        printf("%02X ", data[i]);
-    }
-    std::cout << std::endl;
+    rxBuffer_.insert(rxBuffer_.end(), data.begin(), data.end());
 
-    for (uint8_t byte : data) {
-        if (!inMessage_) {
-            if (byte == '$') {
-                inMessage_ = true;
-                buffer_.clear();
-                buffer_.push_back(byte);
-            }
+    while (true) {
+        auto it = std::find(rxBuffer_.begin(), rxBuffer_.end(), '$');
+        if (it == rxBuffer_.end()) break;
+
+        if (rxBuffer_.end() - it < 6) break;
+
+        if (*(it + 1) != 'M' || *(it + 2) != '>') {
+            rxBuffer_.erase(rxBuffer_.begin(), it + 1);
             continue;
         }
 
-        buffer_.push_back(byte);
+        uint8_t dataLength = *(it + 3);
+        size_t packetLength = 5 + dataLength + 1;
 
-        if (buffer_.size() == 5) {
-            if (buffer_[1] != 'M') {
-                reset();
-                continue;
-            }
-
-            uint8_t direction = buffer_[2];
-            expectedLength_ = buffer_[3];
-            uint8_t cmd = buffer_[4];
-
-            expectedLength_ += 1;
+        if (rxBuffer_.end() - it < packetLength) {
+            break;
         }
 
-        if (buffer_.size() >= 5 && buffer_.size() == 5 + expectedLength_) {
-            parseMSPMessage(buffer_);
-            reset();
+        std::vector<uint8_t> packet(it, it + packetLength);
+
+        if (validateCRC(packet)) {
+            parseMSPMessage(packet);
+        } else {
+            std::cout << "MSP CRC помилка" << std::endl;
         }
+
+        rxBuffer_.erase(rxBuffer_.begin(), it + packetLength);
+    }
+
+    if (rxBuffer_.size() > BUFFER_SIZE) {
+        rxBuffer_.erase(rxBuffer_.begin(), rxBuffer_.end() - BUFFER_SIZE/2);
     }
 }
 
-void MSPParser::reset() {
-    inMessage_ = false;
-    expectedLength_ = 0;
-    buffer_.clear();
-}
-
-bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
-    if (message.size() < 6) {
-        return false;
-    }
-
-    if (message[0] != '$' || message[1] != 'M' || (message[2] != '<' && message[2] != '>')) {
-        return false;
-    }
-
-    uint8_t dataLength = message[3];
-    uint8_t cmd = message[4];
-
-    size_t expectedLength = 5 + dataLength + 1;
-
-    if (message.size() != expectedLength) {
-        return false;
-    }
+bool MSPParser::validateCRC(const std::vector<uint8_t>& message) {
+    if (message.size() < 6) return false;
 
     uint8_t calculatedCrc = 0;
     for (size_t i = 3; i < message.size() - 1; i++) {
@@ -77,9 +53,12 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
     }
 
     uint8_t receivedCrc = message.back();
-    if (calculatedCrc != receivedCrc) {
-        return false;
-    }
+    return calculatedCrc == receivedCrc;
+}
+
+bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
+    uint8_t dataLength = message[3];
+    uint8_t cmd = message[4];
 
     std::cout << "MSP команда: " << static_cast<int>(cmd) << std::endl;
 
@@ -108,8 +87,12 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
                     channels.channels[i] = message[5 + i * 2] | (message[6 + i * 2] << 8);
                 }
 
-                std::cout << "RC_CHANNELS: " << channels.channels[0]
-                          << ", " << channels.channels[1] << ", " << channels.channels[2] << std::endl;
+                std::cout << "RC_CHANNELS: ";
+                for (int i = 0; i < 4; i++) {
+                    std::cout << channels.channels[i];
+                    if (i < 3) std::cout << ", ";
+                }
+                std::cout << std::endl;
 
                 if (rcChannelsReceived) {
                     rcChannelsReceived(channels);
@@ -143,4 +126,8 @@ bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
     }
 
     return true;
+}
+
+void MSPParser::reset() {
+    rxBuffer_.clear();
 }
