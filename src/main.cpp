@@ -1,4 +1,4 @@
-#include <iostream>
+/*#include <iostream>
 #include <string>
 #include <memory>
 #include <csignal>
@@ -175,5 +175,64 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    return 0;
+}*/
+
+#include <iostream>
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+#include <vector>
+#include <cstring>
+#include <atomic>
+
+std::vector<uint8_t> createMSPRequest(uint8_t cmd) {
+    std::vector<uint8_t> req = {'$', 'M', '<', 0, cmd};
+    uint8_t crc = 0;
+    for (size_t i = 3; i < req.size(); i++) crc ^= req[i];
+    req.push_back(crc);
+    return req;
+}
+
+int main() {
+    const char* port = "/dev/ttyAMA0"; // змінити на свій
+    int baud = B115200;
+
+    int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0) { perror("open"); return 1; }
+
+    struct termios tty;
+    memset(&tty, 0, sizeof tty);
+    if (tcgetattr(fd, &tty) != 0) { perror("tcgetattr"); return 1; }
+
+    cfsetospeed(&tty, baud);
+    cfsetispeed(&tty, baud);
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+    tty.c_cflag |= (CLOCAL | CREAD);
+    tty.c_cflag &= ~(PARENB | PARODD);
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_lflag = 0;
+    tty.c_oflag = 0;
+    tty.c_cc[VMIN] = 0;
+    tty.c_cc[VTIME] = 10;
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) { perror("tcsetattr"); return 1; }
+
+    std::vector<uint8_t> req = createMSPRequest(105); // MSP_STATUS або MSP_ATTITUDE
+
+    write(fd, req.data(), req.size());
+    tcdrain(fd);
+
+    uint8_t buf[256];
+    int n = read(fd, buf, sizeof(buf));
+    if (n > 0) {
+        std::cout << "Отримано " << n << " байт: ";
+        for (int i = 0; i < n; i++) printf("%02X ", buf[i]);
+        std::cout << std::endl;
+    } else {
+        std::cout << "Немає відповіді" << std::endl;
+    }
+
+    close(fd);
     return 0;
 }
