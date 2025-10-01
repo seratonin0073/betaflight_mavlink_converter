@@ -8,15 +8,26 @@ MSPParser::MSPParser() {
 }
 
 void MSPParser::processData(const std::vector<uint8_t>& data) {
+    // Лог усіх байтів що приходять
+    std::cout << "[RX] ";
+    for (auto b : data) {
+        printf("%02X ", b);
+    }
+    std::cout << std::endl;
+
     rxBuffer_.insert(rxBuffer_.end(), data.begin(), data.end());
 
     while (true) {
         auto it = std::find(rxBuffer_.begin(), rxBuffer_.end(), '$');
         if (it == rxBuffer_.end()) break;
 
+        // мінімальний розмір пакета "$M><len><cmd><crc>"
         if (rxBuffer_.end() - it < 6) break;
 
-        if (*(it + 1) != 'M' || *(it + 2) != '>') {
+        if (*(it + 1) != 'M' || (*(it + 2) != '>')) {
+            std::cout << "Bad header after '$': "
+                      << std::hex << (int)*(it+1) << " " << (int)*(it+2) << std::dec
+                      << std::endl;
             rxBuffer_.erase(rxBuffer_.begin(), it + 1);
             continue;
         }
@@ -25,7 +36,7 @@ void MSPParser::processData(const std::vector<uint8_t>& data) {
         size_t packetLength = 5 + dataLength + 1;
 
         if (rxBuffer_.end() - it < packetLength) {
-            break;
+            break; // чекаємо ще байти
         }
 
         std::vector<uint8_t> packet(it, it + packetLength);
@@ -33,7 +44,11 @@ void MSPParser::processData(const std::vector<uint8_t>& data) {
         if (validateCRC(packet)) {
             parseMSPMessage(packet);
         } else {
-            std::cout << "MSP CRC помилка" << std::endl;
+            uint8_t calc = 0;
+            for (size_t i = 3; i < packet.size() - 1; i++) calc ^= packet[i];
+            std::cout << "MSP CRC помилка! Отримано="
+                      << (int)packet.back()
+                      << " Очікувалось=" << (int)calc << std::endl;
         }
 
         rxBuffer_.erase(rxBuffer_.begin(), it + packetLength);
@@ -44,6 +59,7 @@ void MSPParser::processData(const std::vector<uint8_t>& data) {
     }
 }
 
+
 bool MSPParser::validateCRC(const std::vector<uint8_t>& message) {
     if (message.size() < 6) return false;
 
@@ -52,8 +68,7 @@ bool MSPParser::validateCRC(const std::vector<uint8_t>& message) {
         calculatedCrc ^= message[i];
     }
 
-    uint8_t receivedCrc = message.back();
-    return calculatedCrc == receivedCrc;
+    return calculatedCrc == message.back();
 }
 
 bool MSPParser::parseMSPMessage(const std::vector<uint8_t>& message) {
