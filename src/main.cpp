@@ -195,7 +195,7 @@ std::vector<uint8_t> createMSPRequest(uint8_t cmd) {
 }
 
 int main() {
-    const char* port = "/dev/ttyAMA0"; // змінити на свій
+    const char* port = "/dev/serial0";
     int baud = B115200;
 
     int fd = open(port, O_RDWR | O_NOCTTY | O_SYNC);
@@ -218,7 +218,7 @@ int main() {
     tty.c_cc[VTIME] = 10;
     if (tcsetattr(fd, TCSANOW, &tty) != 0) { perror("tcsetattr"); return 1; }
 
-    std::vector<uint8_t> req = createMSPRequest(105); // MSP_STATUS або MSP_ATTITUDE
+    std::vector<uint8_t> req = createMSPRequest(105);
 
     write(fd, req.data(), req.size());
     tcdrain(fd);
