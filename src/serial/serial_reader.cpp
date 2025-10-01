@@ -20,14 +20,11 @@ public:
     bool open() {
         fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY | O_SYNC);
         if (fd_ < 0) {
-            std::cerr << "Не вдалося відкрити порт " << port_
-                      << ": " << strerror(errno) << std::endl;
             return false;
         }
 
         struct termios tty;
         if (tcgetattr(fd_, &tty) != 0) {
-            std::cerr << "Помилка tcgetattr: " << strerror(errno) << std::endl;
             close();
             return false;
         }
@@ -44,11 +41,7 @@ public:
             case 500000: speed = B500000; break;
             case 921600: speed = B921600; break;
             case 1000000: speed = B1000000; break;
-            default:
-                std::cerr << "Невідома швидкість " << baudrate_
-                          << ", використовую 115200" << std::endl;
-                speed = B115200;
-                break;
+            default: speed = B115200; break;
         }
 
         cfsetospeed(&tty, speed);
@@ -68,15 +61,11 @@ public:
         tty.c_cflag &= ~CRTSCTS;
 
         if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
-            std::cerr << "Помилка tcsetattr: " << strerror(errno) << std::endl;
             close();
             return false;
         }
 
         tcflush(fd_, TCIOFLUSH);
-
-        std::cout << "Послідовний порт " << port_
-                  << " відкрито на " << baudrate_ << " бод" << std::endl;
         return true;
     }
 
@@ -92,9 +81,6 @@ public:
 
         ssize_t bytesRead = ::read(fd_, buffer, size);
         if (bytesRead < 0) {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                std::cerr << "Помилка читання з порту: " << strerror(errno) << std::endl;
-            }
             return -1;
         }
 
@@ -103,20 +89,15 @@ public:
 
     int writeData(const uint8_t* buffer, size_t size) {
         if (fd_ < 0) {
-            std::cerr << "Порт не відкритий для запису" << std::endl;
             return -1;
         }
 
         ssize_t bytesWritten = ::write(fd_, buffer, size);
         if (bytesWritten < 0) {
-            std::cerr << " Помилка запису в порт: " << strerror(errno) << std::endl;
             return -1;
         }
 
-        if (tcdrain(fd_) != 0) {
-            std::cerr << "Помилка tcdrain: " << strerror(errno) << std::endl;
-        }
-
+        tcdrain(fd_);
         return bytesWritten;
     }
 
@@ -132,7 +113,6 @@ private:
     int baudrate_;
 };
 
-
 SerialReader::SerialReader(const std::string& port, int baudrate)
     : port_(port), baudrate_(baudrate), stopRequested_(false) {
 
@@ -145,14 +125,12 @@ SerialReader::SerialReader(const std::string& port, int baudrate)
         for (int i = 0; possible_ports[i] != nullptr; i++) {
             if (access(possible_ports[i], F_OK) != -1) {
                 port_ = possible_ports[i];
-                std::cout << "Автовизначено порт: " << port_ << std::endl;
                 break;
             }
         }
 
         if (port_.empty()) {
             port_ = "/dev/ttyAMA0";
-            std::cout << "Порт не визначено, використовую " << port_ << std::endl;
         }
     }
 }
@@ -173,10 +151,16 @@ bool SerialReader::startReading() {
     }
 
     stopRequested_ = false;
+
     readThread_ = std::thread([this]() {
         readLoop();
     });
 
+    requestThread_ = std::thread([this]() {
+        requestLoop();
+    });
+
+    std::cout << "Запущено читання з порту: " << port_ << std::endl;
     return true;
 }
 
@@ -195,8 +179,6 @@ void SerialReader::stopReading() {
         serialImpl_->close();
         serialImpl_.reset();
     }
-
-    std::cout << "Читання з порту зупинено" << std::endl;
 }
 
 bool SerialReader::isReading() const {
@@ -209,27 +191,20 @@ bool SerialReader::isConnected() const {
 
 bool SerialReader::writeData(const std::vector<uint8_t>& data) {
     if (!serialImpl_ || !serialImpl_->isOpen()) {
-        std::cerr << "Порт не відкритий" << std::endl;
         return false;
     }
 
     if (data.empty()) {
-        std::cerr << "Немає даних для відправки" << std::endl;
         return false;
     }
 
     std::lock_guard<std::mutex> lock(serialMutex_);
 
-    // Використовуємо метод writeData з SerialImpl
     int bytesWritten = serialImpl_->writeData(data.data(), data.size());
-
     if (bytesWritten != static_cast<int>(data.size())) {
-        std::cerr << "Відправлено не всі дані: " << bytesWritten
-                  << "/" << data.size() << " байт" << std::endl;
         return false;
     }
 
-    //std::cout << "Успішно відправлено " << bytesWritten << " байт" << std::endl;
     return true;
 }
 
@@ -255,30 +230,28 @@ bool SerialReader::sendMSPRequest(uint8_t command) {
     return writeData(request);
 }
 
-void SerialReader::sendNextRequest() {
-    if (!serialImpl_ || !serialImpl_->isOpen() || waitingForResponse) {
-        return;
+bool SerialReader::waitForResponse(int timeoutMs) {
+    auto startTime = std::chrono::steady_clock::now();
+    uint8_t buffer[256];
+
+    while (!stopRequested_) {
+        auto currentTime = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+
+        if (elapsed.count() > timeoutMs) {
+            return false;
+        }
+
+        int bytesRead = serialImpl_->read(buffer, sizeof(buffer));
+        if (bytesRead > 0) {
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    const uint8_t commands[] = {108, 105, 130};
-    const char* commandNames[] = {"ATTITUDE", "RC_CHANNELS", "BATTERY_STATE"};
-
-    currentCommand = commands[requestCounter % 3];
-    std::string commandName = commandNames[requestCounter % 3];
-
-    std::cout << "========================================" << std::endl;
-    std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << " (CMD=" << static_cast<int>(currentCommand) << ")" << std::endl;
-
-    if (sendMSPRequest(currentCommand)) {
-        waitingForResponse = true;
-        std::cout << "Запит " << commandName << " відправлено успішно" << std::endl;
-    } else {
-        std::cout << "Помилка відправки запиту " << commandName << std::endl;
-    }
-
-    requestCounter++;
+    return false;
 }
-
 
 void SerialReader::readLoop() {
     uint8_t buffer[256];
@@ -309,17 +282,55 @@ void SerialReader::readLoop() {
 }
 
 void SerialReader::requestLoop() {
+    std::cout << "Потік запитів MSP запущено" << std::endl;
+
+    const uint8_t MSP_ATTITUDE = 108;
+    const uint8_t MSP_RC = 105;
+    const uint8_t MSP_BATTERY_STATE = 130;
+
     while (!stopRequested_) {
+        if (!serialImpl_ || !serialImpl_->isOpen()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
+        uint8_t command;
+        std::string commandName;
+
+        switch (requestCounter % 3) {
+            case 0:
+                command = MSP_ATTITUDE;
+                commandName = "ATTITUDE";
+                break;
+            case 1:
+                command = MSP_RC;
+                commandName = "RC_CHANNELS";
+                break;
+            case 2:
+                command = MSP_BATTERY_STATE;
+                commandName = "BATTERY_STATE";
+                break;
+        }
+
+        std::cout << "========================================" << std::endl;
+        std::cout << "ВІДПРАВКА ЗАПИТУ: " << commandName << " (CMD=" << static_cast<int>(command) << ")" << std::endl;
+
+        if (sendMSPRequest(command)) {
+            std::cout << "Запит відправлено успішно" << std::endl;
+        }
+
+        requestCounter++;
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
+
+    std::cout << "Потік запитів MSP зупинено" << std::endl;
 }
 
 void SerialReader::enableEmulation() {
     stopReading();
     stopRequested_ = false;
 
-    std::cout << "=== РЕЖИМ ЕМУЛЯЦІЇ АКТИВОВАНО ===" << std::endl;
-    std::cout << "Генерація тестових даних Betaflight MSP..." << std::endl;
+    std::cout << "Запуск емуляції даних..." << std::endl;
 
     readThread_ = std::thread([this]() {
         emulateData();
@@ -365,14 +376,8 @@ void SerialReader::emulateData() {
         }
         data.push_back(crc);
 
-        std::cout << "\n--- Емуляція " << messageType << " ---" << std::endl;
+        std::cout << "Емуляція " << messageType << std::endl;
         std::cout << "Розмір: " << data.size() << " байт" << std::endl;
-        std::cout << "HEX: ";
-        for (size_t i = 0; i < std::min(data.size(), size_t(10)); i++) {
-            printf("%02X ", data[i]);
-        }
-        if (data.size() > 10) std::cout << "...";
-        std::cout << std::endl;
 
         if (dataReceived && !data.empty()) {
             dataReceived(data);

@@ -34,12 +34,8 @@ private:
     void requestLoop();
     void emulateData();
 
-    void sendNextRequest();
-    std::atomic<bool> waitingForResponse{false};
-    uint8_t currentCommand{0};
-    int requestCounter{0};
-
     std::vector<uint8_t> createMSPRequest(uint8_t command);
+    bool waitForResponse(int timeoutMs = 500);
 
     std::string port_;
     int baudrate_;
@@ -47,5 +43,8 @@ private:
     std::thread readThread_;
     std::thread requestThread_;
     std::atomic<bool> stopRequested_;
+    std::atomic<bool> waitingForResponse{false};
+    uint8_t currentCommand{0};
+    int requestCounter{0};
     std::mutex serialMutex_;
 };
